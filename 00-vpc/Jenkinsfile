@@ -1,0 +1,82 @@
+pipeline {
+    agent {
+        label "AGENT-1"
+    }
+    environment {
+        COURSE = "jenkins"
+    }
+    options {
+        timeout(time: 30 , unit:"MINUTES")
+        disableConcurrentBuilds()
+        ansiColor('xterm')
+    }
+    // parameters {
+    //     string(name: "PERSON", defaultvalue: "MR.Jenkins", description: 'Who should I say hello to?')
+    // }
+    stages {
+        stage("init") {
+            steps {
+                script {
+                    withAWS(credentials: "aws-creds" , region: "us-east-1"){
+                        sh """
+                            cd 00-vpc
+                            terraform init -reconfigure
+                        """
+                    }
+                }
+            }
+        }
+        stage("plan") {
+            steps {
+                script {
+                    withAWS(credentials: "aws-creds" , region: "us-east-1"){
+                        sh """
+                            cd 00-vpc
+                            terraform plan
+                        """
+                    }
+                }
+            }
+        }
+        stage("apply") {
+            input {
+                message "should we continue"
+                ok "yes we can"
+                submitter "bob-alice"
+            steps {
+                script {
+                    withAWS(credentials: "aws-creds" , region: "us-east-1"){
+                        sh """
+                            cd 00-vpc
+                            terraform apply -auto-approve
+                        """
+                    }
+
+                }
+            }
+        }
+        // Down stream build
+        stage("Trigger SG"){
+            steps{
+                script{
+                    build job: "10-sg"
+                    propagate: false
+                    wait: false
+                }
+            }
+        }
+    }
+    post {
+        always {
+            echo "hello form always"
+        }
+
+        success {
+            echo "hello from success"
+        }
+
+        failure {
+            echo "hello from failure"
+        }
+    }
+}
