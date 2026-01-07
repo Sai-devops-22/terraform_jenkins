@@ -1,0 +1,103 @@
+pipeline{
+    agent {
+        label "AGENT-1"
+    }
+    environment{
+        COURSE = jenkins
+    }
+    options{
+        timeout(time: 30, unit:"MINUTES")
+        disableConcurrentBuilds()
+        ansiColor()
+    }
+    parameters{
+        string(name:"jen1",defaultvalue:"jenkins",description:"hello")
+    }
+    stages{
+        stage("init"){
+            steps{
+                script{
+                    withAWS(credentials:"aws-creds", region:"us-east-1") 
+                    sh """
+                        cd 10-sg
+                        terraform init -reconfigure
+                    """
+                }
+            }
+        }
+        stage("plan"){
+            steps{
+                script{
+                    withAWS(credentials:"aws-creds", region:"us-east-1")
+                    sh """
+                        cd 10-sg
+                        terraform plan
+                    """
+                }
+            }
+        }
+        stage("apply"){
+            steps{
+                script{
+                    withAWS(credentials:"aws-creds", region:"us-east-1")
+                    sh """
+                        cd 10-sg
+                        terraform apply -auto-approve
+                    """
+                }
+            }
+        }
+        stage("Bastion EKS ACM ALB"){
+            parallel{
+                stage("Trigger Bastion"){
+                    steps{
+                        script{
+                            build job: "20-bastion"
+                            propagate: false
+                            wait: false
+                        }            
+                    }
+                }
+                stage("Trigger EKS"){
+                    steps{
+                        script{
+                            build job: "80-eks"
+                            propagate: false
+                            wait: false
+                        }
+                    }
+                }
+                stage("Trigger ACM"){
+                    steps{
+                        script{
+                            build job: "60-acm"
+                            propagate: false
+                            wait: false
+                        }
+                    }
+                }
+            }
+        }
+        stage("Trigger ALB"){
+            steps{
+                script{
+                    build job: "70-frontend"
+                    propagate: false
+                    wait: false
+                }
+            }
+        }
+    }
+    post{
+        always{
+            echo "hello from always"
+            deleteDir()
+        }
+        success{
+            echo "hello from success"
+        }
+        failure{
+            echo "hello from failure"
+        }
+    }
+}

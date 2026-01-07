@@ -55,6 +55,7 @@ pipeline {
                 }
             }
         }
+        }
         // Down stream build
         stage("Trigger SG"){
             steps{
@@ -65,7 +66,6 @@ pipeline {
                 }
             }
         }
-    }
     post {
         always {
             echo "hello form always"
@@ -79,4 +79,5 @@ pipeline {
             echo "hello from failure"
         }
     }
+}
 }
